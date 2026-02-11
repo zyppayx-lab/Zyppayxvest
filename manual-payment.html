@@ -2,55 +2,114 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<title>Manual Payment | Zyppayx</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zyppayxvest | Manual Payment</title>
+
 <style>
-body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f6f8fb;}
-header { background:#0a1f44;color:#fff;padding:20px;text-align:center;font-size:20px;}
-.container { max-width:500px; margin:30px auto; padding:15px;}
-.card { background:#fff; border-radius:12px; box-shadow:0 4px 12px rgba(0,0,0,0.05); padding:20px; margin-bottom:20px; }
-.card p { margin:10px 0; font-size:14px; color:#333; display:flex; justify-content:space-between; align-items:center; }
-.copy-btn { background:#00c896; color:#fff; padding:4px 10px; border-radius:6px; font-size:12px; cursor:pointer; border:none; margin-left:8px;}
-.amount-input { width:100%; padding:10px; margin-top:5px; border-radius:8px; border:1px solid #ddd; font-size:14px;}
-button#submitPayment { width:100%; padding:12px; background:#0a1f44; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:bold;}
-.loader-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); justify-content:center; align-items:center; z-index:1000; flex-direction:column;}
-.loader { border:6px solid #f3f3f3; border-top:6px solid #00c896; border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite;}
-@keyframes spin { 0% { transform:rotate(0deg); } 100% { transform:rotate(360deg); } }
-.success-tick { display:none; color:#00c896; font-size:50px; animation:scaleUp 0.5s forwards; margin-top:10px;}
-@keyframes scaleUp { 0% { transform:scale(0); } 100% { transform:scale(1); } }
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#f4f6fa;
+  padding:20px;
+}
+
+h2{
+  text-align:center;
+  margin-bottom:15px;
+}
+
+.card{
+  background:linear-gradient(135deg,#00c896,#0a1f44);
+  color:#fff;
+  border-radius:18px;
+  padding:20px;
+  box-shadow:0 10px 25px rgba(0,0,0,.15);
+}
+
+.card p{
+  margin:12px 0;
+  font-weight:bold;
+  font-size:15px;
+}
+
+.copy{
+  font-size:13px;
+  background:#fff;
+  color:#0a1f44;
+  padding:5px 10px;
+  border-radius:6px;
+  cursor:pointer;
+  display:inline-block;
+  margin-top:4px;
+}
+
+button{
+  width:100%;
+  padding:14px;
+  margin-top:18px;
+  border:none;
+  border-radius:12px;
+  background:#0a1f44;
+  color:#fff;
+  font-weight:bold;
+  font-size:15px;
+}
+
+button:disabled{
+  opacity:.6;
+}
+
+.loader{
+  width:45px;
+  height:45px;
+  border:4px solid #ddd;
+  border-top:4px solid #00c896;
+  border-radius:50%;
+  animation:spin 1s linear infinite;
+  margin:20px auto;
+  display:none;
+}
+
+@keyframes spin{
+  100%{transform:rotate(360deg);}
+}
+
+.success{
+  display:none;
+  text-align:center;
+  font-size:18px;
+  color:#00c896;
+  margin-top:15px;
+}
 </style>
 </head>
+
 <body>
 
-<header>Invest Into Zyppayx</header>
+<h2>Manual Bank Transfer</h2>
 
-<div class="container">
-  <div class="card">
-    <p>
-      <span><strong>Bank Name:</strong> Paystack-Titan</span>
-    </p>
-    <p>
-      <span><strong>Account Number:</strong> <span id="accountNumber">9740116304</span></span>
-      <button class="copy-btn" id="copyAccBtn">Copy</button>
-    </p>
-    <p>
-      <span><strong>Account Name:</strong> MOREINFOPAY/Zyppayx</span>
-    </p>
-    <p>
-      <span><strong>Amount to Pay:</strong></span>
-      <input class="amount-input" type="number" id="amountInput" min="1000">
-      <button class="copy-btn" id="copyAmtBtn">Copy</button>
-    </p>
-  </div>
+<div class="card">
+  <p>Bank Name<br>Paystack-Titan</p>
 
-  <button id="submitPayment">Submit Payment</button>
+  <p>
+    Account Number<br>
+    <span id="acc">9740116304</span><br>
+    <span class="copy" onclick="copyText('acc')">Copy</span>
+  </p>
+
+  <p>Account Name<br>MOREINFOPAY / Zyppayx</p>
+
+  <p>
+    Amount to Pay<br>
+    ₦<span id="amount"></span><br>
+    <span class="copy" onclick="copyText('amount')">Copy</span>
+  </p>
 </div>
 
-<div class="loader-overlay" id="loader">
-  <div class="loader"></div>
-  <p style="color:#fff; margin-top:10px;">Submitting your investment...</p>
-  <div class="success-tick" id="successTick">&#10003;</div>
-</div>
+<button id="submitBtn">I Have Paid</button>
+
+<div class="loader" id="loader"></div>
+<div class="success" id="success">✔ Payment Submitted</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -67,61 +126,49 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-let currentUserId = "";
+let uid = "";
+const amount = localStorage.getItem("investAmount") || 0;
+document.getElementById("amount").textContent = amount;
 
-// Get amount from localStorage if user came from invest.html
-const prefillAmount = localStorage.getItem("investAmount") || "";
-document.getElementById("amountInput").value = prefillAmount;
-
-onAuthStateChanged(auth, user => {
-  if(!user){ window.location.href="login.html"; return; }
-  currentUserId = user.uid;
+onAuthStateChanged(auth,user=>{
+  if(!user){
+    window.location.href="login.html";
+    return;
+  }
+  uid = user.uid;
 });
 
-// Copy account number
-document.getElementById("copyAccBtn").onclick = () => {
-  const accNum = document.getElementById("accountNumber").textContent;
-  navigator.clipboard.writeText(accNum).then(()=> alert("Account number copied!"));
+window.copyText = (id)=>{
+  navigator.clipboard.writeText(document.getElementById(id).innerText);
+  alert("Copied!");
 };
 
-// Copy amount
-document.getElementById("copyAmtBtn").onclick = () => {
-  const amt = document.getElementById("amountInput").value;
-  if(!amt){ alert("Enter an amount first"); return; }
-  navigator.clipboard.writeText(amt).then(()=> alert("Amount copied!"));
-};
+document.getElementById("submitBtn").onclick = async ()=>{
+  if(!uid) return;
 
-function showLoader(show){
-  const loader = document.getElementById("loader");
-  loader.style.display = show ? "flex" : "none";
-  if(!show) document.getElementById("successTick").style.display = "none";
-}
+  document.getElementById("submitBtn").disabled = true;
+  document.getElementById("loader").style.display="block";
 
-// Submit payment
-document.getElementById("submitPayment").onclick = async () => {
-  const amount = Number(document.getElementById("amountInput").value);
-  if(!amount || amount < 1000){ alert("Enter an amount ≥ ₦1000"); return; }
-
-  showLoader(true);
-
-  try {
-    await addDoc(collection(db, "users", currentUserId, "investments"), {
-      planId: "Manual Payment",
-      amount: amount,
-      status: "pending",
+  try{
+    await addDoc(collection(db,"users",uid,"investments"),{
+      planId:"Manual Transfer",
+      amount:Number(amount),
+      duration:7,       // you can change later
+      status:"pending",
       createdAt: serverTimestamp()
     });
 
-    document.getElementById("successTick").style.display="block";
+    document.getElementById("loader").style.display="none";
+    document.getElementById("success").style.display="block";
 
     setTimeout(()=>{
-      showLoader(false);
       window.location.href="invest.html";
-    },1500);
+    },2000);
 
-  } catch(e){
-    showLoader(false);
-    alert("Error recording investment. Try again.");
+  }catch(err){
+    alert("Something went wrong, try again");
+    document.getElementById("loader").style.display="none";
+    document.getElementById("submitBtn").disabled=false;
   }
 };
 </script>
