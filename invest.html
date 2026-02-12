@@ -3,167 +3,152 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zyppayxvest | Invest</title>
+<title>Zyppayx | Invest</title>
+
 <style>
-body { margin:0; font-family: Arial, Helvetica, sans-serif; background:#f6f8fb;}
-header { background:#0a1f44;color:#fff;padding:20px;text-align:center;font-size:20px;}
-.container { max-width:1100px;margin:auto;padding:15px;}
-.card { background:#fff;padding:18px;border-radius:12px;margin-bottom:20px;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
-.card h3 { margin:0 0 10px 0; font-size:16px; color:#0a1f44;}
-.card p { margin:4px 0; font-size:14px; color:#666;}
-.amount-input { width:100%; padding:10px; margin-top:8px; border-radius:8px; border:1px solid #ddd; font-size:14px;}
-.quick-amounts { display:flex; gap:10px; margin-top:8px;}
-.quick-amounts button { flex:1; padding:10px; border:none; border-radius:8px; background:#00c896; color:#fff; cursor:pointer;}
-button.main-btn { margin-top:10px; padding:12px; background:#0a1f44; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:bold; width:100%;}
-nav { position:fixed; bottom:0; width:100%; background:#fff; border-top:1px solid #ddd; display:flex; justify-content:space-around; padding:10px 0;}
-nav a { text-decoration:none; color:#555; font-size:13px; text-align:center;}
-nav a.active { color:#00c896; font-weight:bold;}
-.lock { color:#e74c3c; font-weight:bold;}
-.ready { color:#00c896; font-weight:bold;}
-button.disabled { background:#ccc; cursor:not-allowed;}
-button.active { background:#00c896; color:#fff;}
+body{font-family:Arial;background:#f6f8fb;margin:0}
+header{background:#0a1f44;color:#fff;padding:15px;text-align:center}
+.container{padding:15px;max-width:1100px;margin:auto}
+.card{background:#fff;border-radius:14px;padding:15px;margin-bottom:18px;box-shadow:0 4px 12px rgba(0,0,0,.05)}
+.card img{width:100%;border-radius:12px;margin-bottom:10px}
+.card button{width:100%;padding:12px;border:none;border-radius:10px;background:#00c896;color:#fff;font-weight:bold;cursor:pointer}
+input{width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;margin:8px 0}
+.active-card{border-left:6px solid #00c896}
+.lock{color:#e74c3c;font-weight:bold}
+.ready{color:#00c896;font-weight:bold}
 </style>
 </head>
+
 <body>
 
-<header>Choose an Investment Plan</header>
-<div class="container" id="plansContainer">
-  <p>Loading investment plans...</p>
-</div>
+<header>Investment Plans</header>
 
-<nav>
-  <a href="dashboard.html">Home</a>
-  <a href="invest.html" class="active">Invest</a>
-  <a href="refer.html">Refer</a>
-  <a href="alert.html">Alerts</a>
-  <a href="profile.html">Profile</a>
-</nav>
+<div class="container">
+  <h3>Available Plans</h3>
+  <div id="plans"></div>
+
+  <h3>My Active Investments</h3>
+  <div id="active"></div>
+</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth,onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore,collection,getDocs,query,where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyCQ8TCMUAySwLSBN3-0W1GV4XWateS1rqQ",
-  authDomain: "zyppayx-69c54.firebaseapp.com",
-  projectId: "zyppayx-69c54"
-};
+const app = initializeApp({
+  apiKey:"AIzaSyCQ8TCMUAySwLSBN3-0W1GV4XWateS1rqQ",
+  authDomain:"zyppayx-69c54.firebaseapp.com",
+  projectId:"zyppayx-69c54"
+});
+const auth=getAuth(app);
+const db=getFirestore(app);
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+let currentUser=null;
 
-let currentUserId = "";
-const selectedAmount = localStorage.getItem("investAmount") || "";
-
-onAuthStateChanged(auth, async user => {
-  if(!user){ window.location.href="login.html"; return; }
-  currentUserId = user.uid;
+onAuthStateChanged(auth,user=>{
+  if(!user){location.href="login.html";return;}
+  currentUser=user;
   loadPlans();
+  loadActive();
 });
 
 async function loadPlans(){
-  const plansRef = collection(db, "investmentPlans");
-  const snap = await getDocs(plansRef);
-  const container = document.getElementById("plansContainer");
-  container.innerHTML="";
+  const wrap=document.getElementById("plans");
+  wrap.innerHTML="Loading...";
+  const snap=await getDocs(collection(db,"investmentPlans"));
+  wrap.innerHTML="";
 
-  if(snap.empty){ container.innerHTML="<p>No investment plans available.</p>"; return; }
+  snap.forEach(d=>{
+    const p=d.data();
+    if(p.status!=="active")return;
 
-  snap.forEach(planDoc=>{
-    const plan = planDoc.data();
-    if(plan.status!=="active") return;
-
-    const card = document.createElement("div");
+    const card=document.createElement("div");
     card.className="card";
-
     card.innerHTML=`
-      <h3>${plan.title}</h3>
-      <p>Duration: ${plan.duration} days</p>
-      <p>Daily Return: ₦${plan.dailyReturn}</p>
-      <p>Total Return: ₦${plan.totalReturn}</p>
-      <p>Minimum Amount: ₦${plan.minAmount}</p>
-      <input class="amount-input" type="number" min="${plan.minAmount}" placeholder="Enter amount" value="${selectedAmount}">
-      <div class="quick-amounts">
-        <button>₦${plan.minAmount}</button>
-        <button>₦${plan.minAmount*2}</button>
-        <button>₦${plan.minAmount*5}</button>
-      </div>
-      <button class="main-btn">Invest</button>
+      <img src="${p.image}">
+      <h4>${p.title}</h4>
+      <p>ROI: ${p.roiPercent}%</p>
+      <p>Duration: ${p.duration} days</p>
+      <p>Min: ₦${p.minAmount.toLocaleString()} | Max: ₦${p.maxAmount.toLocaleString()}</p>
+      <input type="number" placeholder="Enter amount">
+      <p class="ret"></p>
+      <button>Proceed</button>
     `;
 
-    const input = card.querySelector(".amount-input");
-    card.querySelectorAll(".quick-amounts button").forEach(btn=>{
-      btn.onclick=()=>{ input.value = btn.textContent.replace("₦",""); }
-    });
+    const input=card.querySelector("input");
+    const ret=card.querySelector(".ret");
+    const btn=card.querySelector("button");
 
-    // Redirect to manual-payment.html
-    card.querySelector(".main-btn").onclick=()=>{
-      const amt = Number(input.value);
-      if(!amt || amt < plan.minAmount){ alert(`Enter amount ≥ ₦${plan.minAmount}`); return; }
-      localStorage.setItem("investAmount", amt);
-      window.location.href = "manual-payment.html";
+    input.oninput=()=>{
+      const amt=Number(input.value);
+      if(!amt||amt<p.minAmount||amt>p.maxAmount){
+        ret.textContent="";
+        return;
+      }
+      const total=amt+(amt*p.roiPercent/100);
+      ret.innerHTML=`<b>Total Return:</b> ₦${total.toLocaleString()}`;
     };
 
-    container.appendChild(card);
-  });
+    btn.onclick=()=>{
+      const amt=Number(input.value);
+      if(!amt||amt<p.minAmount||amt>p.maxAmount){
+        alert("Invalid amount");
+        return;
+      }
+      location.href=`manual-payment.html?planId=${d.id}&amount=${amt}`;
+    };
 
-  loadUserInvestments(); // Show pending/active investments
+    wrap.appendChild(card);
+  });
 }
 
-async function loadUserInvestments(){
-  const investmentsRef = collection(db, "users", currentUserId, "investments");
-  const snap = await getDocs(investmentsRef);
-  const container = document.getElementById("plansContainer");
+async function loadActive(){
+  const box=document.getElementById("active");
+  box.innerHTML="Loading...";
+  const q=query(
+    collection(db,"investments"),
+    where("userId","==",currentUser.uid),
+    where("status","==","approved")
+  );
+  const snap=await getDocs(q);
+  box.innerHTML="";
 
-  snap.forEach(invDoc=>{
-    const inv = invDoc.data();
-    if(!inv.duration || !inv.amount) return;
+  if(snap.empty){
+    box.innerHTML="<p>No active investments</p>";
+    return;
+  }
 
-    const maturity = inv.createdAt.toDate().getTime() + (inv.duration*24*60*60*1000);
-    const card = document.createElement("div");
-    card.className="card";
+  snap.forEach(d=>{
+    const inv=d.data();
+    const card=document.createElement("div");
+    card.className="card active-card";
 
-    const timer = document.createElement("p");
-    const btn = document.createElement("button");
-    btn.textContent="Withdraw";
-    btn.disabled = true;
-    btn.className="disabled";
+    const timer=document.createElement("p");
 
-    function update(){
-      const now = Date.now();
-      const diff = maturity - now;
-      if(diff<=0 && inv.status==="active"){
-        timer.innerHTML="<span class='ready'>Investment matured</span>";
-        btn.disabled=false;
-        btn.className="active";
-        btn.onclick=()=>alert("Withdraw flow here");
-      } else if(inv.status==="pending"){
-        timer.innerHTML="<span class='lock'>Pending approval</span>";
-      } else {
+    function tick(){
+      const diff=inv.endDate-Date.now();
+      if(diff<=0){
+        timer.innerHTML="<span class='ready'>Matured</span>";
+      }else{
         const d=Math.floor(diff/86400000);
         const h=Math.floor((diff%86400000)/3600000);
         const m=Math.floor((diff%3600000)/60000);
         const s=Math.floor((diff%60000)/1000);
-        timer.innerHTML=`<span class="lock">Locked:</span> ${d}d ${h}h ${m}m ${s}s`;
+        timer.innerHTML=`<span class='lock'>Locked:</span> ${d}d ${h}h ${m}m ${s}s`;
       }
     }
-
-    setInterval(update,1000);
-    update();
+    setInterval(tick,1000); tick();
 
     card.innerHTML=`
-      <h3>${inv.planId}</h3>
-      <p>Amount: ₦${inv.amount}</p>
-      <p>Status: ${inv.status}</p>
+      <h4>${inv.planTitle}</h4>
+      <p>Amount: ₦${inv.amount.toLocaleString()}</p>
+      <p>Total Return: ₦${inv.totalReturn.toLocaleString()}</p>
     `;
     card.appendChild(timer);
-    card.appendChild(btn);
-    container.appendChild(card);
+    box.appendChild(card);
   });
 }
 </script>
-
 </body>
 </html>
